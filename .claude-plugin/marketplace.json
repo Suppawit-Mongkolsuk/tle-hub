@@ -1,0 +1,75 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "tle-hub",
+  "description": "Tle's personal Claude Code skill and plugin hub",
+  "owner": {
+    "name": "Suppawit Mongkolsuk",
+    "url": "https://github.com/Suppawit-Mongkolsuk"
+  },
+  "plugins": [
+    {
+      "name": "model-foreman",
+      "description": "ผู้จัดการงานที่เคลียร์ spec แล้วแตกงานส่งให้ Haiku, Sonnet หรือ Opus ตามความยาก",
+      "category": "workflow",
+      "tags": ["orchestration", "model-routing"],
+      "source": { "source": "github", "repo": "Suppawit-Mongkolsuk/Model-foreman" }
+    },
+    {
+      "name": "interface-design",
+      "description": "Craft-first design for dashboards, admin panels and tools. Extracts patterns from existing code and audits against them.",
+      "category": "uiux",
+      "tags": ["uiux", "admin", "dashboard"],
+      "source": { "source": "github", "repo": "Dammyjay93/interface-design", "sha": "2f9be3206855bcb2d1d0af262c8bae25cba6658d" }
+    },
+    {
+      "name": "dashboard-design",
+      "description": "Clean dashboards: KPI tiles, charts, comparison periods, empty states, plus a screenshot QA pass.",
+      "category": "uiux",
+      "tags": ["uiux", "dashboard"],
+      "source": { "source": "github", "repo": "abdiraimov-otabek/dashboard-design-skill", "sha": "ba1fd0d6705a45c7937fd7026ca5cee77078cad4" }
+    },
+    {
+      "name": "ux-audit",
+      "description": "UX anti-pattern audit (interface-auditor) and flow checklists (flow-checker) from uxuiprinciples. Works without an API key, with less detail.",
+      "category": "uiux",
+      "tags": ["uiux", "review", "flows"],
+      "source": { "source": "github", "repo": "uxuiprinciples/agent-skills", "sha": "bc3f52deb45e3f8638d9ad0e82149182a6c0e410" },
+      "skills": ["./interface-auditor", "./flow-checker"]
+    },
+    {
+      "name": "web-design-guidelines",
+      "description": "Vercel's UI review: 100+ accessibility, UX and design rules, reported as file:line findings.",
+      "category": "uiux",
+      "tags": ["uiux", "review", "accessibility"],
+      "source": { "source": "git-subdir", "url": "vercel-labs/agent-skills", "path": "skills/web-design-guidelines", "sha": "6ec269328bc400712ee225a173a14b6b29128df7" }
+    },
+    {
+      "name": "impeccable",
+      "description": "Plan-before-code design with curated anti-patterns (/impeccable shape, critique, polish). Use instead of frontend-design for new projects.",
+      "category": "uiux",
+      "tags": ["uiux", "web"],
+      "source": { "source": "git-subdir", "url": "pbakaus/impeccable", "path": "plugin", "sha": "d34c87e1a00989ae8dbdd7f6b30b70f23319e860" }
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "description": "Searchable library of styles, palettes, font pairings and UX rules. For new projects; in existing ones use only its UX review.",
+      "category": "uiux",
+      "tags": ["uiux", "web"],
+      "source": { "source": "git-subdir", "url": "nextlevelbuilder/ui-ux-pro-max-skill", "path": ".claude/skills/ui-ux-pro-max", "sha": "28b3b8dee8c976df4fa3e94aed4e092ad43fcb03" }
+    },
+    {
+      "name": "ui-animation",
+      "description": "UI motion: springs, gestures, scroll effects. Optional, for motion-heavy work.",
+      "category": "uiux",
+      "tags": ["uiux", "motion"],
+      "source": { "source": "git-subdir", "url": "mblode/agent-skills", "path": "skills/ui-animation", "sha": "ff92bf5ae675e8108e7d2f14b22a523fd1303e76" }
+    },
+    {
+      "name": "playwright-eyes",
+      "description": "Playwright MCP plus a skill that makes Claude screenshot and critique its own UI before calling it done.",
+      "category": "uiux",
+      "tags": ["uiux", "review", "screenshot"],
+      "source": "./plugins/playwright-eyes"
+    }
+  ]
+}

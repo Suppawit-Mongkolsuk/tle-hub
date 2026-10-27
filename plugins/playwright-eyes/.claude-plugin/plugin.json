@@ -1,0 +1,12 @@
+{
+  "name": "playwright-eyes",
+  "description": "Playwright MCP plus a skill that makes Claude screenshot and critique its own UI before calling it done.",
+  "version": "0.1.0",
+  "author": { "name": "Suppawit Mongkolsuk", "url": "https://github.com/Suppawit-Mongkolsuk" },
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}
