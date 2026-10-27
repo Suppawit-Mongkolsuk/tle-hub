@@ -41,28 +41,28 @@
       "description": "Vercel's UI review: 100+ accessibility, UX and design rules, reported as file:line findings.",
       "category": "uiux",
       "tags": ["uiux", "review", "accessibility"],
-      "source": { "source": "git-subdir", "url": "vercel-labs/agent-skills", "path": "skills/web-design-guidelines", "sha": "6ec269328bc400712ee225a173a14b6b29128df7" }
+      "source": { "source": "git-subdir", "url": "https://github.com/vercel-labs/agent-skills.git", "path": "skills/web-design-guidelines", "sha": "6ec269328bc400712ee225a173a14b6b29128df7" }
     },
     {
       "name": "impeccable",
       "description": "Plan-before-code design with curated anti-patterns (/impeccable shape, critique, polish). Use instead of frontend-design for new projects.",
       "category": "uiux",
       "tags": ["uiux", "web"],
-      "source": { "source": "git-subdir", "url": "pbakaus/impeccable", "path": "plugin", "sha": "d34c87e1a00989ae8dbdd7f6b30b70f23319e860" }
+      "source": { "source": "git-subdir", "url": "https://github.com/pbakaus/impeccable.git", "path": "plugin", "sha": "d34c87e1a00989ae8dbdd7f6b30b70f23319e860" }
     },
     {
       "name": "ui-ux-pro-max",
       "description": "Searchable library of styles, palettes, font pairings and UX rules. For new projects; in existing ones use only its UX review.",
       "category": "uiux",
       "tags": ["uiux", "web"],
-      "source": { "source": "git-subdir", "url": "nextlevelbuilder/ui-ux-pro-max-skill", "path": ".claude/skills/ui-ux-pro-max", "sha": "28b3b8dee8c976df4fa3e94aed4e092ad43fcb03" }
+      "source": { "source": "git-subdir", "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git", "path": ".claude/skills/ui-ux-pro-max", "sha": "28b3b8dee8c976df4fa3e94aed4e092ad43fcb03" }
     },
     {
       "name": "ui-animation",
       "description": "UI motion: springs, gestures, scroll effects. Optional, for motion-heavy work.",
       "category": "uiux",
       "tags": ["uiux", "motion"],
-      "source": { "source": "git-subdir", "url": "mblode/agent-skills", "path": "skills/ui-animation", "sha": "ff92bf5ae675e8108e7d2f14b22a523fd1303e76" }
+      "source": { "source": "git-subdir", "url": "https://github.com/mblode/agent-skills.git", "path": "skills/ui-animation", "sha": "ff92bf5ae675e8108e7d2f14b22a523fd1303e76" }
     },
     {
       "name": "playwright-eyes",
