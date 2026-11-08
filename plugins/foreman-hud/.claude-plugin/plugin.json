@@ -1,0 +1,6 @@
+{
+  "name": "foreman-hud",
+  "version": "0.4.0",
+  "author": { "name": "Suppawit-Mongkolsuk" },
+  "description": "mod ส่วนตัวสำหรับ model-foreman: บังคับกฎการเลือกโมเดล บันทึก log อัตโนมัติ และแสดงสถานะใน status line"
+}

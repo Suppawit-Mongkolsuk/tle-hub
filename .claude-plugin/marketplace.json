@@ -15,6 +15,20 @@
       "source": { "source": "github", "repo": "Suppawit-Mongkolsuk/Model-foreman" }
     },
     {
+      "name": "foreman-hud",
+      "description": "บังคับกฎ บันทึก log และแสดง status line ให้ model-foreman",
+      "category": "workflow",
+      "tags": ["orchestration", "logging"],
+      "source": "./plugins/foreman-hud"
+    },
+    {
+      "name": "graphify",
+      "description": "แปลง codebase / เอกสารเป็น knowledge graph ที่ query ได้",
+      "category": "workflow",
+      "tags": ["knowledge-graph", "codebase"],
+      "source": "./plugins/graphify"
+    },
+    {
       "name": "interface-design",
       "description": "Craft-first design for dashboards, admin panels and tools. Extracts patterns from existing code and audits against them.",
       "category": "uiux",

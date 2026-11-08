@@ -10,7 +10,11 @@ Tle's personal Claude Code plugin marketplace. Add it once per machine, then ins
 
 ```
 /plugin install model-foreman@tle-hub
+/plugin install foreman-hud@tle-hub
+/plugin install graphify@tle-hub
 ```
+
+`foreman-hud` enforces model-foreman's routing rules and writes `.claude/foreman-log.jsonl` and `.claude/router-log.md` in the project. Add both to the project's `.gitignore`.
 
 ## UI/UX
 
@@ -47,6 +51,8 @@ Install per project with `--scope project` if you don't want a plugin active eve
 | Plugin | Source | Note |
 |---|---|---|
 | model-foreman | Suppawit-Mongkolsuk/Model-foreman | Tracks the default branch |
+| foreman-hud | this repo | Companion to model-foreman: rule enforcement, logs, status line |
+| graphify | this repo | |
 | interface-design | Dammyjay93/interface-design | `/interface-design:extract` pulls patterns from existing code |
 | dashboard-design | abdiraimov-otabek/dashboard-design-skill | |
 | ux-audit | uxuiprinciples/agent-skills | Only `interface-auditor` and `flow-checker` are loaded. Works without an API key; `flow-checker` adds an upgrade note to its output |
