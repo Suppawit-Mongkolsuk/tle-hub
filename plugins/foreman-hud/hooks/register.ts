@@ -1,10 +1,11 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-// foreman-hud: mod ส่วนตัวสำหรับ model-foreman (ใช้คู่กับ model-foreman 0.6.0 ขึ้นไป)
+// foreman-hud: mod ส่วนตัวสำหรับ model-foreman (ใช้คู่กับ model-foreman 0.7.0 ขึ้นไป)
 // - บังคับกฎ: worker ต้องระบุโมเดล, ห้ามลดระดับ, FIX ได้ 1 ครั้งต่อโมเดล, ESCALATE ต้องยกระดับจริง,
 //   reviewer อยู่ระหว่างขั้นต่ำตาม rubric กับเพดานใน brief, QA เป็น Sonnet เสมอ,
 //   ทุก agent ต้องมี effort ใน brief, รีวิวไม่เกิน 5 ครั้งต่อ task,
-//   รีวิวรวม (TASK: FINAL) ต้องเป็น Opus, worker ที่ไฟล์ซ้อนกับ worker ที่ยังทำอยู่ถูกปฏิเสธ
+//   รีวิวรวม (TASK: FINAL) ต้องเป็น Opus, worker ที่ไฟล์ซ้อนกับ worker ที่ยังทำอยู่ถูกปฏิเสธ,
+//   investigator (D-task) ต้องเป็น Sonnet ขึ้นไป และหาไม่เจอแล้วต้องยกระดับ
 // - บันทึก log จากเหตุการณ์จริงลง .claude/foreman-log.jsonl และ .claude/router-log.md
 // - เก็บ state ของ task ลง .claude/foreman/state.json ให้ทำงานต่อข้าม session ได้
 // - แสดงสถานะใน status line และ toast
@@ -12,6 +13,7 @@ import type { EngineInterface, Register } from 'claude-code'
 const WORKER = 'model-foreman:worker'
 const REVIEWER = 'model-foreman:reviewer'
 const QA = 'model-foreman:qa'
+const INVESTIGATOR = 'model-foreman:investigator'
 const LADDER = ['haiku', 'sonnet', 'opus'] as const
 type Tier = (typeof LADDER)[number]
 const MAX_REVIEWS = 5
@@ -34,11 +36,14 @@ const RESULT_TH: Record<string, string> = {
   ESCALATE_REVIEW: 'ส่งต่อรีวิว',
   BLOCKED: 'ติด',
   CAP: 'ชนเพดานรีวิว',
+  FOUND: 'เจอต้นเหตุ',
 }
+
+const INVESTIGATOR_STATUSES = ['FOUND', 'PARTIAL', 'NOT_FOUND', 'NEEDS_CONTEXT'] as const
 
 const WORKER_STATUSES = ['DONE_WITH_CONCERNS', 'DONE', 'NEEDS_CONTEXT', 'BLOCKED', 'DISPUTE'] as const
 
-type Role = 'worker' | 'qa' | 'reviewer'
+type Role = 'worker' | 'qa' | 'reviewer' | 'investigator'
 
 type Task = {
   key: string
@@ -234,7 +239,8 @@ function refreshStatus($: EngineInterface, s: State) {
   const parts = ['Foreman']
   for (const r of active) {
     const t = s.tasks.get(r.key)
-    const what = r.role === 'reviewer' ? `รีวิว ${t?.reviews ?? 0}/${MAX_REVIEWS}` : r.role === 'qa' ? 'QA' : 'กำลังทำ'
+    const what =
+      r.role === 'reviewer' ? `รีวิว ${t?.reviews ?? 0}/${MAX_REVIEWS}` : r.role === 'qa' ? 'QA' : r.role === 'investigator' ? 'หาสาเหตุ' : 'กำลังทำ'
     parts.push(`${t?.id ?? r.key} ${label(r.tier)} ${what}`)
   }
   parts.push(all.length > 0 ? `เสร็จ ${all.filter(t => t.isClosed).length}/${all.length}` : 'ON')
@@ -299,7 +305,15 @@ export const register: Register = on => {
 
   on('agent.spawn', async ($, e, next) => {
     const role: Role | undefined =
-      e.subagentType === WORKER ? 'worker' : e.subagentType === QA ? 'qa' : e.subagentType === REVIEWER ? 'reviewer' : undefined
+      e.subagentType === WORKER
+        ? 'worker'
+        : e.subagentType === QA
+          ? 'qa'
+          : e.subagentType === REVIEWER
+            ? 'reviewer'
+            : e.subagentType === INVESTIGATOR
+              ? 'investigator'
+              : undefined
     if (!role) return next(e)
     const isReviewer = role === 'reviewer'
 
@@ -353,6 +367,19 @@ export const register: Register = on => {
     } else if (role === 'qa') {
       tier = 'sonnet'
       call = { ...e, model: 'sonnet' }
+    } else if (role === 'investigator') {
+      const asked = tierOf(e.model) ?? 'sonnet'
+      if (asked === 'haiku') return { deny: `foreman-hud: ${t.id} investigator ต้องเป็น Sonnet ขึ้นไป` }
+      if (t.mustEscalateFrom && idx(asked) <= idx(t.mustEscalateFrom)) {
+        return {
+          deny:
+            t.mustEscalateFrom === 'opus'
+              ? `foreman-hud: ${t.id} Opus หาต้นเหตุไม่เจอ ให้หยุดและถามผู้ใช้`
+              : `foreman-hud: ${t.id} ${label(t.mustEscalateFrom)} หาไม่เจอ ต้องส่ง Opus ต่อ`,
+        }
+      }
+      tier = asked
+      call = { ...e, model: asked }
     } else {
       const asked = tierOf(e.model)
       if (!asked) return { deny: 'foreman-hud: ต้องระบุ model (haiku / sonnet / opus) ตอนเรียก worker ตามคะแนนใน rubric' }
@@ -401,7 +428,11 @@ export const register: Register = on => {
       t.reviewTiers.push(tier)
       t.minNextReview = undefined
     } else if (role === 'qa') t.qaRuns += 1
-    else {
+    else if (role === 'investigator') {
+      t.mustEscalateFrom = undefined
+      t.firstTier ??= tier
+      t.lastTier = tier
+    } else {
       if (isFixRetry) t.fixUsed.push(tier)
       t.needsFix = false
       t.mustEscalateFrom = undefined
@@ -465,6 +496,25 @@ export const register: Register = on => {
       if (code === 'NEEDS_CONTEXT') $.ui.toast(`${t.id} ต้องการข้อมูลเพิ่มก่อนเริ่ม`)
       else if (code === 'BLOCKED') $.ui.toast(`${t.id} ติด: worker ทำต่อไม่ได้`)
       else if (code === 'DISPUTE') $.ui.toast(`${t.id} worker แย้ง feedback ส่งให้ reviewer ตัดสิน`)
+    } else if (run.role === 'investigator') {
+      const status = field(e.answer, 'สถานะ') ?? (e.isAborted ? 'ถูกหยุด' : '-')
+      const word = firstWord(status).toUpperCase()
+      const code = INVESTIGATOR_STATUSES.find(c => c === word)
+      const outOfScope = /^ใช่/.test(field(e.answer, 'อยู่นอกขอบเขตที่ให้ค้น') ?? '')
+      await logEvent($, s, {
+        run: t.run, task: t.id, event: 'found', role: 'investigator', tier: run.tier,
+        status, code: code ?? '-', cause: field(e.answer, 'ต้นเหตุ') ?? '-',
+        files: parseFiles(field(e.answer, 'ไฟล์ที่ต้องแก้')), outOfScope, usage: u,
+      })
+      if (code === 'FOUND') {
+        await closeTask($, s, t, 'FOUND')
+        $.ui.toast(outOfScope ? `${t.id} เจอต้นเหตุ แต่อยู่นอกขอบเขต ต้องถามคุณก่อน` : `✓ ${t.id} เจอต้นเหตุ`)
+      } else if (code === 'PARTIAL' || code === 'NOT_FOUND') {
+        t.mustEscalateFrom = run.tier
+        $.ui.toast(`${t.id} ${label(run.tier)} ยังหาต้นเหตุไม่เจอ`)
+      } else if (code === 'NEEDS_CONTEXT') {
+        $.ui.toast(`${t.id} ต้องการข้อมูลเพิ่มเพื่อหาสาเหตุ`)
+      }
     } else if (run.role === 'qa') {
       const status = field(e.answer, 'QA สถานะ') ?? (e.isAborted ? 'ถูกหยุด' : '-')
       const severity = field(e.answer, 'ระดับสูงสุด')

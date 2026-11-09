@@ -4,7 +4,7 @@ mod ส่วนตัวสำหรับ [model-foreman](https://github.com/S
 
 ## ทำอะไร
 
-**บังคับกฎด้วยโค้ด** (ไม่พึ่งให้ Opus จำเอง) ใช้คู่กับ model-foreman 0.6.0 ขึ้นไป
+**บังคับกฎด้วยโค้ด** (ไม่พึ่งให้ Opus จำเอง) ใช้คู่กับ model-foreman 0.7.0 ขึ้นไป
 - ทุก agent ต้องมีบรรทัด `effort: low / medium / high` ใน brief (ห้าม max)
 - worker ต้องระบุ model (haiku / sonnet / opus) และห้ามลดระดับโมเดลของ task เดิม
 - FIX ได้ 1 ครั้งต่อโมเดล (รวมรอบที่แก้ตาม QA) ครั้งที่สองต้องยกระดับ ส่วน `NEEDS_CONTEXT` ไม่นับ
@@ -13,6 +13,7 @@ mod ส่วนตัวสำหรับ [model-foreman](https://github.com/S
 - ถ้า reviewer ตอบ ESCALATE_REVIEW รอบถัดไปต้องเป็นระดับที่สูงกว่า (ยกเพดานตามไปด้วย)
 - QA เป็น Sonnet เสมอ
 - รีวิวรวมทั้งงาน (`TASK: FINAL`) ต้องเป็น Opus
+- investigator (D-task) ต้องเป็น Sonnet ขึ้นไป ได้ `NOT_FOUND` / `PARTIAL` แล้วต้องส่ง Opus ต่อ ถ้า Opus ก็ไม่เจอให้หยุด
 - worker ที่ช่อง `ไฟล์` ซ้อนกับ worker ที่ยังทำอยู่ถูกปฏิเสธ ให้รอตัวแรกเสร็จก่อน
 - รีวิวไม่เกิน 5 ครั้งต่อ task ครั้งที่ 6 ถูกปฏิเสธและปิด task
 - task ที่ผ่านหรือติดแล้วเรียกซ้ำไม่ได้ใน run เดิม (ใช้ task id เดิมใน run ใหม่ได้ ตามบรรทัด `RUN:` ใน brief)
@@ -54,6 +55,11 @@ claude plugin test .
 ```
 
 ## ประวัติการแก้
+
+**0.7.0** (ใช้คู่กับ model-foreman 0.7.0)
+- รู้จัก agent `investigator`: บังคับ Sonnet ขึ้นไป, หาไม่เจอแล้วต้องยกระดับ, ปิด task เมื่อ `FOUND`
+- log บันทึกต้นเหตุ ไฟล์ที่ต้องแก้ และว่าอยู่นอกขอบเขตไหม พร้อม toast เตือนเมื่อต้นเหตุอยู่นอกขอบเขต
+- status line แสดง "หาสาเหตุ"
 
 **0.6.0** (ใช้คู่กับ model-foreman 0.6.0)
 - รีวิวรวมทั้งงาน (`TASK: FINAL`) ต้องเป็น Opus

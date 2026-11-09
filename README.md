@@ -60,6 +60,7 @@ Install per project with `--scope project` if you don't want a plugin active eve
 | impeccable | pbakaus/impeccable | Runs hooks on SessionStart, after Edit/Write, and on Stop, using a native engine binary it verifies by checksum |
 | ui-ux-pro-max | nextlevelbuilder/ui-ux-pro-max-skill | Only the main skill, not the banner/slides/brand extras. Needs Python 3. In existing projects, tell it to keep the current tokens |
 | ui-animation | mblode/agent-skills | |
+| checklist-design | Checklist-Design/skills | `/checklist-design audit` or `critique`. Its prompt hook adds a hint when a message mentions words like "audit" or "critique", even for non-design audits |
 | playwright-eyes | this repo | Playwright MCP + `visual-check` skill. Needs Node; first run downloads a browser |
 
 ## Updating a pinned plugin

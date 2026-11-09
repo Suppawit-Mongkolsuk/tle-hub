@@ -60,7 +60,7 @@ function spawnInput(prompt: string, subagentType: string, model?: string) {
   }
 }
 
-async function spawn($: Engine, type: 'worker' | 'qa' | 'reviewer', id: string, model?: string, extra = '') {
+async function spawn($: Engine, type: 'worker' | 'qa' | 'reviewer' | 'investigator', id: string, model?: string, extra = '') {
   return $.agent.spawn(spawnInput(brief(id, extra), `model-foreman:${type}`, model))
 }
 
@@ -502,6 +502,45 @@ describe('0.6: รีวิวรวมและไฟล์ซ้อน', () =>
     const lines = (env.files.get('.claude/foreman-log.jsonl') ?? '').trim().split('\n').map(l => JSON.parse(l))
     expect(lines[0]).toMatchObject({ files: ['src/a.ts'] })
     expect(lines[1]).toMatchObject({ patch: '.claude/foreman/patches/R-T1.patch' })
+  })
+})
+
+describe('0.7: investigator (D-task)', () => {
+  test('ห้ามใช้ Haiku ไม่ระบุ model ได้ Sonnet', async ($, on) => {
+    const env = setup(on)
+    expect((await spawn($, 'investigator', 'D1', 'haiku')).deny).toContain('Sonnet ขึ้นไป')
+    const r = await spawn($, 'investigator', 'D1')
+    expect(r.deny).toBeUndefined()
+    expect(env.spawned.at(-1)?.model).toBe('sonnet')
+  })
+
+  test('FOUND ปิด task และบันทึกต้นเหตุกับไฟล์ลง log', async ($, on) => {
+    const env = setup(on)
+    const r = await spawn($, 'investigator', 'D1', 'sonnet')
+    await finish($, r.agentId!, 'สถานะ: FOUND\nต้นเหตุ: backend/src/ot.ts:42 — ไม่เช็ก null\nไฟล์ที่ต้องแก้: backend/src/ot.ts, frontend/src/Ot.tsx\nอยู่นอกขอบเขตที่ให้ค้น: ใช่ — backend')
+    expect(env.toasts.at(-1)).toContain('นอกขอบเขต')
+    const row = JSON.parse((env.files.get('.claude/foreman-log.jsonl') ?? '').trim().split('\n').at(-1)!)
+    expect(row).toMatchObject({ event: 'found', code: 'FOUND', outOfScope: true, files: ['backend/src/ot.ts', 'frontend/src/Ot.tsx'] })
+    expect(env.files.get('.claude/router-log.md')).toContain('เจอต้นเหตุ')
+    expect((await spawn($, 'investigator', 'D1', 'opus')).deny).toContain('ปิดไปแล้ว')
+  })
+
+  test('Sonnet ไม่เจอ ต้องส่ง Opus และ Opus ไม่เจอ ต้องหยุด', async ($, on) => {
+    setup(on)
+    const r1 = await spawn($, 'investigator', 'D1', 'sonnet')
+    await finish($, r1.agentId!, 'สถานะ: NOT_FOUND')
+    expect((await spawn($, 'investigator', 'D1', 'sonnet')).deny).toContain('ต้องส่ง Opus')
+    const r2 = await spawn($, 'investigator', 'D1', 'opus')
+    expect(r2.deny).toBeUndefined()
+    await finish($, r2.agentId!, 'สถานะ: PARTIAL')
+    expect((await spawn($, 'investigator', 'D1', 'opus')).deny).toContain('ถามผู้ใช้')
+  })
+
+  test('NEEDS_CONTEXT ส่งโมเดลเดิมซ้ำได้', async ($, on) => {
+    setup(on)
+    const r1 = await spawn($, 'investigator', 'D1', 'sonnet')
+    await finish($, r1.agentId!, 'สถานะ: NEEDS_CONTEXT\nคำถาม: ข้อมูลตัวอย่าง')
+    expect((await spawn($, 'investigator', 'D1', 'sonnet')).deny).toBeUndefined()
   })
 })
 

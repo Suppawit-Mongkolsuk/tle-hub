@@ -79,6 +79,13 @@
       "source": { "source": "git-subdir", "url": "https://github.com/mblode/agent-skills.git", "path": "skills/ui-animation", "sha": "ff92bf5ae675e8108e7d2f14b22a523fd1303e76" }
     },
     {
+      "name": "checklist-design",
+      "description": "Design review against Checklist Design's 100+ checklists: audit item by item, or quick critique.",
+      "category": "uiux",
+      "tags": ["uiux", "review", "accessibility"],
+      "source": { "source": "github", "repo": "Checklist-Design/skills", "sha": "bfae71e507b1b7c03c12e0756402b60eb80f5d14" }
+    },
+    {
       "name": "playwright-eyes",
       "description": "Playwright MCP plus a skill that makes Claude screenshot and critique its own UI before calling it done.",
       "category": "uiux",
