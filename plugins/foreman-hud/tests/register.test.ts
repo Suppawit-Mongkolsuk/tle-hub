@@ -42,7 +42,7 @@ function setup(on: On, settings?: string): Env {
 }
 
 const brief = (id: string, extra = '') =>
-  `TASK: ${id} — ปุ่ม settings\nคะแนน: 2\nSKILL ที่ต้องโหลดก่อนเริ่ม: ui-guidelines\n${extra}`
+  `TASK: ${id} — ปุ่ม settings\nคะแนน: 2\nSKILL ที่ต้องโหลดก่อนเริ่ม: ui-guidelines\n${extra}\neffort: medium`
 
 const usage = { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 20, cache_creation_input_tokens: 0, model: 'x' }
 
@@ -256,7 +256,7 @@ describe('QA', () => {
     expect(env.spawned.at(-1)?.model).toBe('sonnet')
     expect(env.statuses.at(-1)).toContain('T2 Sonnet QA')
     await finish($, q.agentId!, 'TASK: T2\nQA สถานะ: พบปัญหา\nปัญหาที่พบ: ค่าว่างทำให้ 500')
-    expect(env.toasts.at(-1)).toBe('T2 QA พบปัญหา ส่งต่อให้ reviewer')
+    expect(env.toasts.at(-1)).toBe('T2 QA พบปัญหา')
 
     const r = await spawn($, 'reviewer', 'T2', 'opus')
     await finish($, r.agentId!, 'VERDICT: PASS')
@@ -329,3 +329,179 @@ describe('log และสถานะ', () => {
     expect(env.statuses.at(-1)).toBeUndefined()
   })
 })
+
+describe('0.5: effort และเพดาน reviewer', () => {
+  test('brief ไม่มี effort หรือใช้ max ถูกปฏิเสธ', async ($, on) => {
+    setup(on)
+    const none = await $.agent.spawn(spawnInput('TASK: T1 — x\nคะแนน: 2', 'model-foreman:worker', 'haiku'))
+    expect(none.deny).toContain('effort')
+    const max = await $.agent.spawn(spawnInput('TASK: T1 — x\neffort: max', 'model-foreman:worker', 'haiku'))
+    expect(max.deny).toContain('ห้าม max')
+  })
+
+  test('ระดับรีวิวใน brief เป็นเพดาน: brief บอก Sonnet ห้ามเรียก Opus', async ($, on) => {
+    setup(on)
+    const w = await spawn($, 'worker', 'T1', 'haiku', 'ระดับรีวิว: sonnet')
+    await finish($, w.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const opus = await spawn($, 'reviewer', 'T1', 'opus', 'ระดับรีวิว: sonnet')
+    expect(opus.deny).toContain('สูงสุด Sonnet')
+    const sonnet = await spawn($, 'reviewer', 'T1', 'sonnet', 'ระดับรีวิว: sonnet')
+    expect(sonnet.deny).toBeUndefined()
+  })
+
+  test('ESCALATE_REVIEW ยกเพดานตาม: brief บอก Haiku แต่รอบสองใช้ Sonnet ได้ ส่วน Opus ยังไม่ได้', async ($, on) => {
+    setup(on)
+    const w = await spawn($, 'worker', 'T1', 'haiku', 'ระดับรีวิว: haiku')
+    await finish($, w.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const r1 = await spawn($, 'reviewer', 'T1', 'haiku', 'ระดับรีวิว: haiku')
+    await finish($, r1.agentId!, 'VERDICT: ESCALATE_REVIEW')
+    expect((await spawn($, 'reviewer', 'T1', 'opus', 'ระดับรีวิว: haiku')).deny).toContain('สูงสุด Sonnet')
+    expect((await spawn($, 'reviewer', 'T1', 'sonnet', 'ระดับรีวิว: haiku')).deny).toBeUndefined()
+  })
+
+  test('QA พบปัญหาระดับกลาง: ต้อง Opus แม้ brief บอก Sonnet', async ($, on) => {
+    setup(on)
+    const w = await spawn($, 'worker', 'T2', 'sonnet', 'ระดับรีวิว: sonnet')
+    await finish($, w.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const q = await spawn($, 'qa', 'T2', undefined, 'ระดับรีวิว: sonnet')
+    await finish($, q.agentId!, 'QA สถานะ: พบปัญหา\nระดับสูงสุด: กลาง')
+    expect((await spawn($, 'reviewer', 'T2', 'sonnet', 'ระดับรีวิว: sonnet')).deny).toContain('QA พบปัญหาระดับกลางขึ้นไป')
+    expect((await spawn($, 'reviewer', 'T2', 'opus', 'ระดับรีวิว: sonnet')).deny).toBeUndefined()
+  })
+
+  test('QA พบปัญหาระดับต่ำ: ไม่บังคับ Opus', async ($, on) => {
+    setup(on)
+    const w = await spawn($, 'worker', 'T2', 'haiku')
+    await finish($, w.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const q = await spawn($, 'qa', 'T2')
+    await finish($, q.agentId!, 'QA สถานะ: พบปัญหา\nระดับสูงสุด: ต่ำ')
+    expect((await spawn($, 'reviewer', 'T2', 'haiku')).deny).toBeUndefined()
+  })
+})
+
+describe('0.5: สิทธิ์ FIX และการยกระดับ', () => {
+  test('FIX ได้ 1 ครั้งต่อโมเดล ครั้งที่สองต้องยกระดับ', async ($, on) => {
+    setup(on)
+    const w1 = await spawn($, 'worker', 'T1', 'haiku')
+    await finish($, w1.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const r1 = await spawn($, 'reviewer', 'T1', 'sonnet')
+    await finish($, r1.agentId!, 'VERDICT: FIX')
+    const w2 = await spawn($, 'worker', 'T1', 'haiku')
+    expect(w2.deny).toBeUndefined()
+    await finish($, w2.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const r2 = await spawn($, 'reviewer', 'T1', 'sonnet')
+    await finish($, r2.agentId!, 'VERDICT: FIX')
+    expect((await spawn($, 'worker', 'T1', 'haiku')).deny).toContain('ใช้สิทธิ์ FIX ไปแล้ว ต้องยกระดับเป็น Sonnet')
+    expect((await spawn($, 'worker', 'T1', 'sonnet')).deny).toBeUndefined()
+  })
+
+  test('แก้ตาม QA นับเป็นการใช้สิทธิ์ FIX', async ($, on) => {
+    setup(on)
+    const w1 = await spawn($, 'worker', 'T1', 'haiku')
+    await finish($, w1.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const q = await spawn($, 'qa', 'T1')
+    await finish($, q.agentId!, 'QA สถานะ: พบปัญหา\nระดับสูงสุด: สูง')
+    const w2 = await spawn($, 'worker', 'T1', 'haiku')
+    expect(w2.deny).toBeUndefined()
+    await finish($, w2.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const r = await spawn($, 'reviewer', 'T1', 'opus')
+    await finish($, r.agentId!, 'VERDICT: FIX')
+    expect((await spawn($, 'worker', 'T1', 'haiku')).deny).toContain('ใช้สิทธิ์ FIX ไปแล้ว')
+  })
+
+  test('NEEDS_CONTEXT ไม่นับเป็นการใช้สิทธิ์ FIX', async ($, on) => {
+    const env = setup(on)
+    const w1 = await spawn($, 'worker', 'T1', 'haiku')
+    await finish($, w1.agentId!, 'สถานะ: NEEDS_CONTEXT\nคำถาม: ไฟล์ไหน')
+    expect(env.toasts.at(-1)).toContain('ต้องการข้อมูลเพิ่ม')
+    const w2 = await spawn($, 'worker', 'T1', 'haiku')
+    await finish($, w2.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const r = await spawn($, 'reviewer', 'T1', 'sonnet')
+    await finish($, r.agentId!, 'VERDICT: FIX')
+    expect((await spawn($, 'worker', 'T1', 'haiku')).deny).toBeUndefined()
+  })
+
+  test('ESCALATE ต้องยกระดับจริง และ Opus ได้ ESCALATE ต้องหยุด', async ($, on) => {
+    setup(on)
+    const w1 = await spawn($, 'worker', 'T1', 'sonnet')
+    await finish($, w1.agentId!, 'สถานะ: DONE')
+    const r1 = await spawn($, 'reviewer', 'T1', 'sonnet')
+    await finish($, r1.agentId!, 'VERDICT: ESCALATE')
+    expect((await spawn($, 'worker', 'T1', 'sonnet')).deny).toContain('ต้องส่งให้ Opus')
+    const w2 = await spawn($, 'worker', 'T1', 'opus')
+    await finish($, w2.agentId!, 'สถานะ: DONE')
+    const r2 = await spawn($, 'reviewer', 'T1', 'opus')
+    await finish($, r2.agentId!, 'VERDICT: ESCALATE')
+    expect((await spawn($, 'worker', 'T1', 'opus')).deny).toContain('หยุดและรายงานผู้ใช้')
+  })
+})
+
+describe('0.5: run id, state และ log', () => {
+  test('task id เดิมใช้ได้ใน run ใหม่', async ($, on) => {
+    setup(on)
+    const r = await spawn($, 'reviewer', 'T1', 'sonnet', 'RUN: R-a')
+    await finish($, r.agentId!, 'VERDICT: PASS')
+    expect((await spawn($, 'worker', 'T1', 'haiku', 'RUN: R-a')).deny).toContain('ปิดไปแล้ว')
+    expect((await spawn($, 'worker', 'T1', 'haiku', 'RUN: R-b')).deny).toBeUndefined()
+  })
+
+  test('state ถูกเก็บลงไฟล์ และโหลดกลับตอนเริ่ม session ใหม่', async ($, on) => {
+    const env = setup(on)
+    const w = await spawn($, 'worker', 'T1', 'haiku', 'RUN: R-x')
+    await finish($, w.agentId!, 'สถานะ: DONE\nผล test: ผ่าน')
+    const r = await spawn($, 'reviewer', 'T1', 'sonnet', 'RUN: R-x')
+    await finish($, r.agentId!, 'VERDICT: FIX')
+    const saved = env.files.get('.claude/foreman/state.json') ?? ''
+    expect(saved).toContain('"key": "R-x/T1"')
+    expect(saved).toContain('"needsFix": true')
+  })
+
+  test('โหลด state: task ที่ปิดใน run เดิมยังปิดอยู่หลังเปิด session ใหม่', async ($, on) => {
+    const env = setup(on)
+    env.files.set('.claude/foreman/state.json', JSON.stringify({ version: 1, tasks: [{
+      key: 'R-y/T1', run: 'R-y', isRunExplicit: true, id: 'T1', title: '', score: '2', skill: '-', isHighRisk: false,
+      reviewTiers: ['sonnet'], reviews: 1, qaRuns: 0, needsFix: false, fixUsed: [], isClosed: true, result: 'PASS', tokensIn: 0, tokensOut: 0,
+    }] }))
+    await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true })
+    expect((await spawn($, 'worker', 'T1', 'haiku', 'RUN: R-y')).deny).toContain('ปิดไปแล้ว')
+  })
+
+  test('log ตอน spawn worker มี run, คะแนน และระดับรีวิว', async ($, on) => {
+    const env = setup(on)
+    await spawn($, 'worker', 'T1', 'haiku', 'RUN: R-z\nระดับรีวิว: haiku\nQA: ต้อง')
+    const first = JSON.parse((env.files.get('.claude/foreman-log.jsonl') ?? '').trim().split('\n')[0]!)
+    expect(first).toMatchObject({ run: 'R-z', task: 'T1', score: '2', reviewLevel: 'haiku', qa: 'ต้อง', effort: 'medium' })
+  })
+})
+
+describe('0.6: รีวิวรวมและไฟล์ซ้อน', () => {
+  test('รีวิวรวม (TASK: FINAL) ต้องเป็น Opus', async ($, on) => {
+    setup(on)
+    const sonnet = await $.agent.spawn(spawnInput('TASK: FINAL — รีวิวรวม\nRUN: R-f\neffort: high', 'model-foreman:reviewer', 'sonnet'))
+    expect(sonnet.deny).toContain('รีวิวรวมทั้งงาน')
+    const opus = await $.agent.spawn(spawnInput('TASK: FINAL — รีวิวรวม\nRUN: R-f\neffort: high', 'model-foreman:reviewer', 'opus'))
+    expect(opus.deny).toBeUndefined()
+  })
+
+  test('worker ที่ไฟล์ซ้อนกับ worker ที่ยังทำอยู่ถูกปฏิเสธ และส่งได้เมื่อตัวแรกเสร็จ', async ($, on) => {
+    setup(on)
+    const w1 = await spawn($, 'worker', 'T1', 'sonnet', 'ไฟล์: src/a.ts, `src/b.tsx`')
+    expect(w1.deny).toBeUndefined()
+    const clash = await spawn($, 'worker', 'T2', 'sonnet', 'ไฟล์: ./src/b.tsx, src/c.ts')
+    expect(clash.deny).toContain('ซ้อนกับ T1 ที่ยังทำอยู่ (src/b.tsx)')
+    const free = await spawn($, 'worker', 'T3', 'sonnet', 'ไฟล์: src/d.ts')
+    expect(free.deny).toBeUndefined()
+    await finish($, w1.agentId!, 'สถานะ: DONE')
+    expect((await spawn($, 'worker', 'T2', 'sonnet', 'ไฟล์: ./src/b.tsx, src/c.ts')).deny).toBeUndefined()
+  })
+
+  test('log ตอน worker เสร็จบันทึก path ของ patch', async ($, on) => {
+    const env = setup(on)
+    const w = await spawn($, 'worker', 'T1', 'haiku', 'ไฟล์: src/a.ts')
+    await finish($, w.agentId!, 'สถานะ: DONE\npatch: .claude/foreman/patches/R-T1.patch (1 ไฟล์, +2 -1)')
+    const lines = (env.files.get('.claude/foreman-log.jsonl') ?? '').trim().split('\n').map(l => JSON.parse(l))
+    expect(lines[0]).toMatchObject({ files: ['src/a.ts'] })
+    expect(lines[1]).toMatchObject({ patch: '.claude/foreman/patches/R-T1.patch' })
+  })
+})
+

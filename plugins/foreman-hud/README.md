@@ -4,19 +4,23 @@ mod ส่วนตัวสำหรับ [model-foreman](https://github.com/S
 
 ## ทำอะไร
 
-**บังคับกฎด้วยโค้ด** (ไม่พึ่งให้ Opus จำเอง)
-- worker ต้องระบุ model (haiku / sonnet / opus)
-- task เดิมห้ามลดระดับโมเดล (Sonnet แล้วกลับไป Haiku ไม่ได้)
-- reviewer ต้องระบุ model เสมอ (ไม่ระบุ = ปฏิเสธ ไม่ใช้ Opus ให้อัตโนมัติ)
-- reviewer ต้องไม่ต่ำกว่าระดับที่ rubric กำหนด (ความเสี่ยงสูง / คะแนน 7+ / worker เป็น Opus / QA พบปัญหา → Opus, คะแนน 4–6 → Sonnet, คะแนน 0–3 และ test ผ่าน → Haiku ได้)
-- ถ้า reviewer ตอบ ESCALATE_REVIEW รอบถัดไปต้องเป็นระดับที่สูงกว่า
+**บังคับกฎด้วยโค้ด** (ไม่พึ่งให้ Opus จำเอง) ใช้คู่กับ model-foreman 0.6.0 ขึ้นไป
+- ทุก agent ต้องมีบรรทัด `effort: low / medium / high` ใน brief (ห้าม max)
+- worker ต้องระบุ model (haiku / sonnet / opus) และห้ามลดระดับโมเดลของ task เดิม
+- FIX ได้ 1 ครั้งต่อโมเดล (รวมรอบที่แก้ตาม QA) ครั้งที่สองต้องยกระดับ ส่วน `NEEDS_CONTEXT` ไม่นับ
+- ได้ ESCALATE แล้วต้องส่งให้โมเดลที่สูงกว่าจริง ถ้า Opus ได้ ESCALATE ให้หยุดและรายงานผู้ใช้
+- reviewer ต้องระบุ model และอยู่ระหว่าง**ขั้นต่ำ**ตาม rubric (ความเสี่ยงสูง / คะแนน 7+ / worker เป็น Opus / QA พบปัญหาระดับกลางขึ้นไป → Opus, คะแนน 4–6 → Sonnet, คะแนน 0–3 และ test ผ่าน → Haiku ได้) กับ**เพดาน**ในช่อง `ระดับรีวิว` ของ brief
+- ถ้า reviewer ตอบ ESCALATE_REVIEW รอบถัดไปต้องเป็นระดับที่สูงกว่า (ยกเพดานตามไปด้วย)
 - QA เป็น Sonnet เสมอ
+- รีวิวรวมทั้งงาน (`TASK: FINAL`) ต้องเป็น Opus
+- worker ที่ช่อง `ไฟล์` ซ้อนกับ worker ที่ยังทำอยู่ถูกปฏิเสธ ให้รอตัวแรกเสร็จก่อน
 - รีวิวไม่เกิน 5 ครั้งต่อ task ครั้งที่ 6 ถูกปฏิเสธและปิด task
-- task ที่ผ่านหรือติดแล้วเรียก worker ซ้ำไม่ได้
+- task ที่ผ่านหรือติดแล้วเรียกซ้ำไม่ได้ใน run เดิม (ใช้ task id เดิมใน run ใหม่ได้ ตามบรรทัด `RUN:` ใน brief)
 
 **บันทึก log จากเหตุการณ์จริง** ในโปรเจกต์ที่กำลังทำงาน
 - `.claude/foreman-log.jsonl` ทุกเหตุการณ์ (spawn / done / qa / verdict) พร้อม effort และ token จริง
 - `.claude/router-log.md` หนึ่งแถวต่อ task ตอนปิด task พร้อมลำดับ reviewer ที่ใช้และ token in/out รวม
+- `.claude/foreman/state.json` สถานะของ task (รวมสิทธิ์ FIX ที่ใช้ไป) ทำให้เปิด session ใหม่แล้วทำ run เดิมต่อได้
 
 **แสดงสถานะ**
 - status line: `Foreman · T2 Sonnet กำลังทำ · เสร็จ 1/3`
@@ -39,6 +43,7 @@ mod ส่วนตัวสำหรับ [model-foreman](https://github.com/S
 ```
 .claude/router-log.md
 .claude/foreman-log.jsonl
+.claude/foreman/state.json
 ```
 
 ## ทดสอบ
@@ -49,6 +54,20 @@ claude plugin test .
 ```
 
 ## ประวัติการแก้
+
+**0.6.0** (ใช้คู่กับ model-foreman 0.6.0)
+- รีวิวรวมทั้งงาน (`TASK: FINAL`) ต้องเป็น Opus
+- ปฏิเสธ worker ที่แก้ไฟล์ซ้อนกับ worker ที่ยังทำอยู่ (อ่านจากช่อง `ไฟล์:` ใน brief)
+- log บันทึกรายการไฟล์ตอน spawn และ path ของ patch ตอน worker เสร็จ
+
+**0.5.0** (ใช้คู่กับ model-foreman 0.5.0)
+- อ่านรายงาน format ใหม่: สถานะ worker แบบ enum, ระดับปัญหาของ QA, toast เมื่อ worker ขอข้อมูล ติด หรือแย้ง feedback
+- QA บังคับ Opus รีวิวเฉพาะปัญหาระดับกลางขึ้นไป
+- เพดาน reviewer ตามช่อง `ระดับรีวิว` ใน brief
+- นับสิทธิ์ FIX ต่อโมเดล และบังคับยกระดับหลัง ESCALATE
+- บังคับ effort ใน brief
+- run id จากบรรทัด `RUN:` และเก็บ state ลง `.claude/foreman/state.json`
+- log ตอน spawn worker บันทึกคะแนน, ความเสี่ยง, QA, ระดับรีวิว และ skill
 
 **0.4.0**
 - "ไม่พบปัญหา" ไม่ถูกนับเป็น QA พบปัญหาอีกต่อไป (เดิมทำให้ต้องใช้ Opus รีวิวทุกครั้งที่มี QA)
